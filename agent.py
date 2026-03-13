@@ -91,6 +91,7 @@ Format the report with clear headings and bullet points where appropriate.
 
 
 def _format_podcast_section(podcasts: list[dict[str, Any]]) -> str:
+    """Format a ranked list of podcast dicts into a human-readable text block for the synthesis prompt."""
     lines = []
     for p in podcasts:
         score = p.get("relevance_score", "N/A")
@@ -103,6 +104,7 @@ def _format_podcast_section(podcasts: list[dict[str, Any]]) -> str:
 
 
 def _format_audiobook_section(audiobooks: list[dict[str, Any]]) -> str:
+    """Format a ranked list of audiobook dicts into a human-readable text block for the synthesis prompt."""
     lines = []
     for ab in audiobooks:
         score = ab.get("relevance_score", "N/A")

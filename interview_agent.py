@@ -183,6 +183,7 @@ class InterviewPrepAgent:
         return "\n\n".join(parts) if parts else f"No {source} content retrieved."
 
     def _assemble_report(self, questions: str, answers: str, strategy: str) -> str:
+        """Combine the three LLM outputs into a single formatted markdown report."""
         divider = "\n" + "═" * 60 + "\n"
         return (
             f"# Interview Preparation Report\n"

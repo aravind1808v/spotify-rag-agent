@@ -48,6 +48,7 @@ def interactive_loop(agent: SpotifyRAGAgent) -> None:
 
 
 def main() -> None:
+    """Parse CLI arguments and dispatch to Spotify RAG mode or interview prep mode."""
     parser = argparse.ArgumentParser(
         description="Spotify RAG chatbot – top podcasts & audiobooks on any topic. "
                     "Also supports interview prep from a resume + job description."
