@@ -2,7 +2,7 @@
 
 A RAG (Retrieval-Augmented Generation) agent that combines the **Spotify API**, **Cohere**, and **Claude** to deliver two features:
 
-1. **Spotify Content Explorer** — search any topic and get a ranked, synthesised report of the top podcasts and audiobooks on Spotify.
+1. **Spotify Content Explorer** — search any topic and get a ranked, synthesised report of the top podcasts and audiobooks on Spotify. Adapts its output structure to your query intent.
 2. **Interview Prep** — upload your resume and a job description to get custom interview questions, STAR-method answers, and a personalised preparation strategy.
 
 ---
@@ -20,23 +20,31 @@ A RAG (Retrieval-Augmented Generation) agent that combines the **Spotify API**, 
                └──────────┬─────────────┘    └───────────┬──────────────┘
                           │                              │
           ┌───────────────▼──────────────┐  ┌───────────▼──────────────┐
-          │  1. Spotify API Search       │  │  1. Parse Resume + JD    │
+          │  1. Input Guardrails         │  │  1. Input Guardrails     │
+          │     (guardrails.py)          │  │     (guardrails.py)      │
+          ├──────────────────────────────┤  ├──────────────────────────┤
+          │  2. Spotify API Search       │  │  2. Parse Resume + JD    │
           │     (spotify_tools.py)       │  │     (resume_parser.py)   │
           ├──────────────────────────────┤  ├──────────────────────────┤
-          │  2. Cohere Rerank            │  │  2. Chunk + Tag by source│
+          │  3. Cohere Rerank            │  │  3. Chunk + Tag by source│
           │     (ranking.py)             │  │     (resume_parser.py)   │
           ├──────────────────────────────┤  ├──────────────────────────┤
-          │  3. Cohere Embeddings        │  │  3. Cohere Embeddings    │
+          │  4. Cohere Embeddings        │  │  4. Cohere Embeddings    │
           │  +  FAISS Vector Store       │  │  +  FAISS Vector Store   │
           │     (embeddings_store.py)    │  │     (embeddings_store.py)│
           ├──────────────────────────────┤  ├──────────────────────────┤
-          │  4. Semantic Retrieval       │  │  4. Source-filtered      │
-          │     (top-k chunks)           │  │     Retrieval per pass   │
+          │  5. FAISS → Cohere Rerank    │  │  5. FAISS → Cohere Rerank│
+          │     (two-stage retrieval)    │  │     per source filter    │
           ├──────────────────────────────┤  ├──────────────────────────┤
-          │  5. Claude Synthesis         │  │  5. Claude: Questions    │
-          │     (comprehensive report)   │  │         + STAR Answers   │
-          └──────────────────────────────┘  │         + Prep Strategy  │
-                                            └──────────────────────────┘
+          │  6. Query Intent Classify    │  │  6. Claude: Questions    │
+          │     (query_intent.py)        │  │         + STAR Answers   │
+          ├──────────────────────────────┤  │         + Prep Strategy  │
+          │  7. Intent-aware Synthesis   │  ├──────────────────────────┤
+          │     Claude (4 prompt shapes) │  │  7. Output Guardrails    │
+          ├──────────────────────────────┤  │     (guardrails.py)      │
+          │  8. Output Guardrails        │  └──────────────────────────┘
+          │     (guardrails.py)          │
+          └──────────────────────────────┘
 ```
 
 ---
@@ -45,7 +53,8 @@ A RAG (Retrieval-Augmented Generation) agent that combines the **Spotify API**, 
 
 | Component | Tool |
 |---|---|
-| LLM | Claude (Anthropic) via `langchain-anthropic` |
+| LLM (synthesis) | Claude Sonnet via `langchain-anthropic` |
+| LLM (judge + classifier) | Claude Haiku via `langchain-anthropic` |
 | Embeddings | Cohere `embed-english-v3.0` |
 | Reranking | Cohere `rerank-english-v3.0` |
 | Vector Store | FAISS (in-memory) |
@@ -69,8 +78,6 @@ pip install -r requirements.txt
 ```
 
 ### 2. Configure API keys
-
-Copy the example env file and fill in your keys:
 
 ```bash
 cp .env.example .env
@@ -97,28 +104,29 @@ COHERE_API_KEY=your_cohere_api_key
 
 ### Spotify Content Explorer
 
-Search any topic and get a ranked report of the top 10 podcasts and top 3 audiobooks:
-
 ```bash
 # Single query
 python main.py --query "mindfulness meditation"
 
-# Interactive mode (keeps prompting for topics)
+# Interactive mode
 python main.py
+
+# With RAG evaluations
+python main.py --query "mindfulness meditation" --eval
 ```
 
-**Example output sections:**
-- Overview of the topic on Spotify
-- Top Podcasts — what makes each unique, who it's for
-- Top Audiobooks — authors, themes, key takeaways
-- Key Themes across all content
-- Recommendations — top picks by depth and relevance
+The output structure adapts to your query intent:
+
+| Query type | Intent detected | Output shape |
+|---|---|---|
+| `"mindfulness meditation"` | discovery | Overview + topic sections + Where to Start |
+| `"best sleep podcast for anxiety"` | recommendation | Direct pick first + justifications + Top 3 |
+| `"podcast vs audiobook for stoicism"` | comparison | Verdict first + side-by-side + Our Verdict |
+| `"everything about intermittent fasting"` | deep_dive | Synthesis + thematic sections + Key Takeaways |
 
 ---
 
 ### Interview Prep
-
-Upload your resume and a job description to get a personalised prep report:
 
 ```bash
 # Resume PDF + JD PDF
@@ -128,25 +136,28 @@ python main.py --resume my_resume.pdf --jd job_description.pdf
 python main.py --resume my_resume.pdf --jd job_description.txt
 
 # Resume PDF + raw JD text
-python main.py --resume my_resume.pdf --jd "Senior ML Engineer, 5+ years Python, Spark..."
+python main.py --resume my_resume.pdf --jd "Senior ML Engineer, 5+ years Python..."
 
-# Save the report to a file
-python main.py --resume my_resume.pdf --jd job_description.pdf --interview-output prep_report.txt
+# Save report to file
+python main.py --resume my_resume.pdf --jd job_description.txt --interview-output prep_report.txt
+
+# With RAG evaluations
+python main.py --resume my_resume.pdf --jd job_description.txt --eval
 ```
 
 **The report contains 3 parts:**
 
 **Part 1 — Targeted Interview Questions**
-Identifies the top 5 gaps between your resume and the JD, then generates 2 focused questions per gap (behavioural + technical) with hints on what a strong answer covers.
+Identifies gaps between your resume and the JD, generates 2 focused questions per gap (behavioural + technical) with hints on what a strong answer covers. Grounded strictly in the provided documents.
 
 **Part 2 — Suggested STAR Answers**
-For each question, drafts a Situation → Task → Action → Result answer grounded in your actual resume experience. Does not fabricate projects or metrics.
+Drafts Situation → Task → Action → Result answers using only your actual resume experience. Does not fabricate projects, metrics, or skills not present in your resume.
 
 **Part 3 — Preparation Strategy**
-- Strengths to lead with in the interview
-- Top 3 gaps to study before the interview, with specific action items
-- Smart questions to ask the interviewer
-- Tactical tips for this role type
+- Strengths to lead with, drawn from your resume
+- Top gaps to study before the interview with specific action items
+- Smart questions to ask the interviewer grounded in the JD
+- Tactical tips specific to the role type
 
 ---
 
@@ -156,29 +167,44 @@ For each question, drafts a Situation → Task → Action → Result answer grou
 spotify-rag-agent/
 ├── main.py               # CLI entry point
 ├── agent.py              # Spotify RAG pipeline orchestrator
+├── interview_agent.py    # Interview prep pipeline orchestrator
+├── query_intent.py       # Query intent classifier + intent-specific prompt templates
 ├── spotify_tools.py      # LangChain tools wrapping Spotify Web API
 ├── ranking.py            # Cohere rerank + composite scoring
-├── embeddings_store.py   # FAISS vector store with Cohere embeddings
-├── interview_agent.py    # Interview prep pipeline orchestrator
+├── embeddings_store.py   # FAISS vector store, Cohere embeddings, two-stage retrieval
 ├── resume_parser.py      # Resume + JD parsing (PDF, TXT, URL)
+├── guardrails.py         # Input/output validation (no LLM cost)
+├── rag_evals.py          # LLM-as-judge RAG evaluation metrics
 ├── requirements.txt      # Python dependencies
 └── .env.example          # API key template
 ```
+
+See [EVALS_AND_GUARDRAILS.md](EVALS_AND_GUARDRAILS.md) for a detailed guide to the evaluation and guardrails system.
 
 ---
 
 ## How the RAG Pipeline Works
 
 ### Spotify Mode
-1. **Search** — Fetches top 10 podcasts + top 3 audiobooks from Spotify API
-2. **Rank** — Cohere rerank scores each result for semantic relevance, combined with episode count (popularity) and description length (richness) in a weighted composite score
-3. **Embed** — All results are embedded with Cohere and indexed in an in-memory FAISS store
-4. **Retrieve** — Top-6 most semantically similar chunks are retrieved for the user's query
-5. **Synthesise** — Claude writes a comprehensive, structured report from the ranked results and retrieved context
+
+1. **Guardrails** — Validates query length, detects prompt injection
+2. **Search** — Fetches top 10 podcasts + top 3 audiobooks from Spotify API
+3. **Rank** — Cohere rerank scores each result for semantic relevance, combined with episode count and description richness in a weighted composite score
+4. **Embed** — All results embedded with Cohere and indexed in FAISS
+5. **Two-stage retrieval** — FAISS fetches a broad candidate pool (k×3), Cohere rerank re-scores and selects top-8 by cross-encoder relevance
+6. **Intent classification** — Claude Haiku classifies the query as `discovery`, `recommendation`, `comparison`, or `deep_dive` and extracts sub-questions
+7. **Intent-aware synthesis** — Claude Sonnet uses a prompt template shaped for the detected intent; sub-questions drive section headings rather than a fixed template
+8. **Output guardrails** — Checks report length and detects LLM refusal phrases
 
 ### Interview Prep Mode
-1. **Parse** — Extracts text from resume and JD (PDF, TXT, or URL)
-2. **Chunk** — Splits both into 400-char overlapping chunks tagged by source (`resume` / `jd`)
-3. **Embed** — Chunks are embedded with Cohere and indexed in FAISS
-4. **Retrieve** — Three separate retrieval passes with source-filtered queries (resume chunks vs JD chunks)
-5. **Synthesise** — Three Claude calls: gap analysis + questions → STAR answers → prep strategy
+
+1. **Guardrails** — Validates resume file (PDF/TXT, non-empty) and JD input (file path, URL, or raw text ≥50 chars)
+2. **Parse** — Extracts text from resume and JD
+3. **Chunk** — Splits both into 400-char overlapping chunks tagged by source (`resume` / `jd`)
+4. **Embed** — Chunks embedded with Cohere and indexed in FAISS
+5. **Two-stage retrieval** — Per-pass: FAISS fetches k×3 candidates filtered by source, Cohere rerank selects top-10
+6. **Synthesise** — Three Claude Sonnet calls, each grounded in strict no-fabrication instructions:
+   - Gap analysis → targeted interview questions
+   - STAR answers grounded in resume evidence only
+   - Preparation strategy tied to JD requirements
+7. **Output guardrails** — Checks all three report sections are present

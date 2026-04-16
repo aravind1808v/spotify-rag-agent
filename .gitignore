@@ -3,6 +3,11 @@
 *.env
 .cache
 
+# Sensitive documents — resumes and job descriptions
+*.pdf
+jd.txt
+jd.pdf
+
 # Python
 __pycache__/
 *.py[cod]

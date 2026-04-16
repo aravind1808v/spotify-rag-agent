@@ -20,12 +20,14 @@ os.environ.setdefault("USER_AGENT", "SpotifyRAGAgent/1.0")
 from agent import SpotifyRAGAgent
 
 
-def interactive_loop(agent: SpotifyRAGAgent) -> None:
+def interactive_loop(agent: SpotifyRAGAgent, run_evals: bool = False) -> None:
     """Run a continuous interactive Q&A session."""
     print("\n" + "=" * 60)
     print("  Spotify RAG Chatbot")
     print("  Powered by Claude + Cohere + Spotify")
     print("  Type 'quit' or 'exit' to stop.")
+    if run_evals:
+        print("  [eval mode ON — RAG evaluations will run after each query]")
     print("=" * 60 + "\n")
 
     while True:
@@ -41,7 +43,7 @@ def interactive_loop(agent: SpotifyRAGAgent) -> None:
             print("Goodbye!")
             break
 
-        report = agent.run(query)
+        report = agent.run(query, run_evals=run_evals)
         print("\n" + "=" * 60)
         print(report)
         print("=" * 60 + "\n")
@@ -77,6 +79,17 @@ def main() -> None:
         default=None,
         help="Optional path to save the interview prep report (e.g. prep_report.txt).",
     )
+    parser.add_argument(
+        "--eval",
+        action="store_true",
+        default=False,
+        help=(
+            "Run LLM-as-judge RAG evaluations after the pipeline completes. "
+            "Prints a scored report covering context relevance, faithfulness, "
+            "answer relevance, retrieval precision, and (interview mode) resume grounding. "
+            "Uses claude-haiku for the judge calls."
+        ),
+    )
     args = parser.parse_args()
 
     # ── Interview prep mode ─────────────────────────────────────────────────────
@@ -85,7 +98,7 @@ def main() -> None:
             parser.error("Both --resume and --jd are required for interview prep mode.")
         from interview_agent import InterviewPrepAgent
         agent = InterviewPrepAgent()
-        report = agent.run(resume_path=args.resume, jd=args.jd)
+        report = agent.run(resume_path=args.resume, jd=args.jd, run_evals=args.eval)
         print("\n" + "=" * 60)
         print(report)
         print("=" * 60)
@@ -99,13 +112,13 @@ def main() -> None:
     agent = SpotifyRAGAgent()
 
     if args.query:
-        report = agent.run(args.query)
+        report = agent.run(args.query, run_evals=args.eval)
         print("\n" + "=" * 60)
         print(report)
         print("=" * 60)
         sys.exit(0)
     else:
-        interactive_loop(agent)
+        interactive_loop(agent, run_evals=args.eval)
 
 
 if __name__ == "__main__":
