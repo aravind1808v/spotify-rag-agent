@@ -1,11 +1,17 @@
 """
 interview_agent.py
 Orchestrates the interview prep pipeline:
-  1. Parse resume + job description
-  2. Chunk and embed into FAISS
-  3. Generate targeted interview questions (gap analysis)
-  4. Generate suggested answers grounded in the candidate's resume
-  5. Generate a personalised preparation strategy
+  1. Input guardrails (resume file validation, JD input validation)
+  2. Parse resume + job description (PDF, TXT, or URL)
+  3. Chunk into 400-char overlapping segments tagged by source (resume / jd)
+  4. Cohere embeddings + FAISS vector store
+  5. Two-stage retrieval per pass — FAISS candidate pool → Cohere rerank,
+     filtered by source (resume or jd chunks), k=10
+  6. Three Claude synthesis calls:
+       - Gap analysis → targeted interview questions
+       - STAR answers grounded in resume evidence only
+       - Preparation strategy tied to JD requirements
+  7. Output guardrails (all three report sections present, length check)
 """
 
 import os

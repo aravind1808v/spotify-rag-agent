@@ -1,11 +1,14 @@
 """
 agent.py
-LangChain ReAct agent that:
-  1. Calls the Spotify tools to fetch top-10 podcasts + top-3 audiobooks
-  2. Ranks results using Cohere rerank (ranking.py)
-  3. Embeds all content into a FAISS vector store (embeddings_store.py)
-  4. Retrieves the most semantically relevant chunks
-  5. Synthesises a comprehensive report using Claude (Anthropic)
+Orchestrates the Spotify RAG pipeline:
+  1. Input guardrails (query validation, prompt injection check)
+  2. Spotify API search — top-10 podcasts + top-3 audiobooks
+  3. Cohere rerank + composite scoring (ranking.py)
+  4. Cohere embeddings + FAISS vector store (embeddings_store.py)
+  5. Two-stage retrieval — FAISS candidate pool → Cohere rerank (k=8)
+  6. Query intent classification — discovery / recommendation / comparison / deep_dive
+  7. Intent-aware synthesis via Claude using intent-specific prompt templates
+  8. Output guardrails (length and completeness checks)
 """
 
 import os
