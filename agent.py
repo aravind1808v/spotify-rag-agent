@@ -153,9 +153,9 @@ class SpotifyRAGAgent:
         print("► Step 4: Retrieving and reranking top chunks with Cohere...")
         context, docs_with_scores = retrieve_and_rerank(vector_store, query, k=8)
 
-        # Retrieval quality guardrail — Cohere scores are already 0-1
-        similarity_pcts = [score * 100 for _, score in docs_with_scores]
-        retrieval_guard = check_retrieval_quality(similarity_pcts)
+        # Retrieval quality guardrail — pass raw Cohere scores (0-1)
+        cohere_scores = [score for _, score in docs_with_scores]
+        retrieval_guard = check_retrieval_quality(cohere_scores, scores_are_cohere=True)
         retrieval_guard.print_warnings()
 
         # ── Step 5: Classify query intent ──────────────────────────────────────

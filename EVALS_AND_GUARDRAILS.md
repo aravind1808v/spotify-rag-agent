@@ -59,15 +59,24 @@ The extension-before-existence check prevents a common mistake: passing `jd.pdf`
 
 ### Retrieval quality guardrail
 
-#### `check_retrieval_quality(similarity_scores)`
+#### `check_retrieval_quality(scores, scores_are_cohere)`
 
-Runs after FAISS+Cohere retrieval. Inspects the similarity percentages of retrieved chunks and warns if the retrieval set is low quality.
+Runs after retrieval. Warns if the retrieved chunk set is low quality.
+
+**FAISS similarity scores (0–100 pct):** absolute threshold check.
 
 | Condition | Behaviour |
 |---|---|
 | > 50% of chunks below 30% similarity | Soft warning with average score |
 
-This is a heuristic signal — low retrieval quality means the final report may not be well-grounded in relevant content.
+**Cohere rerank scores (0–1):** distribution-aware check. Cohere scores are relative — an absolute threshold is meaningless (a score of 0.08 can be the most relevant document). Two conditions trigger a warning:
+
+| Condition | Behaviour |
+|---|---|
+| Top score < 0.05 | Soft warning — nothing in the corpus matched the query |
+| > 50% of chunks below 30% of the top score | Soft warning — major drop-off in quality across the retrieved set |
+
+Pass `scores_are_cohere=True` when scores come from `retrieve_and_rerank`.
 
 ### Output guardrails
 

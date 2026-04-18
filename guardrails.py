@@ -190,42 +190,70 @@ def validate_jd_input(jd: str) -> GuardrailResult:
 # ── Retrieval quality guardrail ─────────────────────────────────────────────────
 
 def check_retrieval_quality(
-    similarity_scores: list[float],
+    scores: list[float],
+    scores_are_cohere: bool = False,
     threshold: float = LOW_RETRIEVAL_SCORE_THRESHOLD,
     warn_fraction: float = LOW_RETRIEVAL_WARN_FRACTION,
 ) -> GuardrailResult:
     """
-    Inspect FAISS similarity scores (already converted to 0–100 pct) and warn
-    if too many chunks fall below the relevance threshold.
+    Warn if the retrieved chunk set is low quality.
+
+    For FAISS similarity scores (0–100 pct): uses an absolute threshold —
+    warns if more than `warn_fraction` of chunks fall below `threshold * 100`.
+
+    For Cohere rerank scores (0–1): uses a distribution-aware check because
+    Cohere scores are relative and an absolute threshold is meaningless.
+    Two conditions trigger a warning:
+      - Top score < 0.05: nothing in the corpus matched the query at all.
+      - More than half the chunks score below 30% of the top score:
+        the reranker found a few decent results but most are irrelevant.
 
     Args:
-        similarity_scores: List of similarity percentages (0–100) from FAISS.
-        threshold:         Score below which a chunk is considered low-quality (0–100).
-        warn_fraction:     Fraction of chunks below threshold that triggers a warning.
-
-    Returns:
-        GuardrailResult with warnings if retrieval quality is poor.
+        scores:             Similarity percentages (0–100) for FAISS, or raw
+                            Cohere rerank scores (0–1) when scores_are_cohere=True.
+        scores_are_cohere:  Set True when scores come from Cohere rerank.
+        threshold:          FAISS mode only — low-quality floor (0–1, default 0.30).
+        warn_fraction:      FAISS mode only — fraction below threshold to trigger warn.
     """
     warnings: list[str] = []
 
-    if not similarity_scores:
+    if not scores:
         return GuardrailResult(
             passed=True,
             warnings=["No retrieval scores available to evaluate quality."]
         )
 
-    threshold_pct = threshold * 100
-    low_quality = [s for s in similarity_scores if s < threshold_pct]
-    fraction_low = len(low_quality) / len(similarity_scores)
-    avg_score = sum(similarity_scores) / len(similarity_scores)
+    if scores_are_cohere:
+        top_score = max(scores)
+        avg_score = sum(scores) / len(scores)
 
-    if fraction_low > warn_fraction:
-        warnings.append(
-            f"Low retrieval quality: {len(low_quality)}/{len(similarity_scores)} chunks "
-            f"scored below {threshold_pct:.0f}% similarity. "
-            f"Average score: {avg_score:.1f}%. "
-            "Results may not be highly relevant to your query."
-        )
+        if top_score < 0.05:
+            warnings.append(
+                f"Very low Cohere rerank scores (top: {top_score:.3f}, avg: {avg_score:.3f}). "
+                "The retrieved content may not be relevant to your query."
+            )
+        else:
+            relative_floor = top_score * 0.30
+            low_quality = [s for s in scores if s < relative_floor]
+            if len(low_quality) > len(scores) / 2:
+                warnings.append(
+                    f"Uneven retrieval quality: {len(low_quality)}/{len(scores)} chunks "
+                    f"scored below 30% of the top score ({top_score:.3f}). "
+                    f"Average: {avg_score:.3f}. Some retrieved chunks may be off-topic."
+                )
+    else:
+        threshold_pct = threshold * 100
+        low_quality = [s for s in scores if s < threshold_pct]
+        fraction_low = len(low_quality) / len(scores)
+        avg_score = sum(scores) / len(scores)
+
+        if fraction_low > warn_fraction:
+            warnings.append(
+                f"Low retrieval quality: {len(low_quality)}/{len(scores)} chunks "
+                f"scored below {threshold_pct:.0f}% similarity. "
+                f"Average score: {avg_score:.1f}%. "
+                "Results may not be highly relevant to your query."
+            )
 
     return GuardrailResult(passed=True, warnings=warnings)
 
