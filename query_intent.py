@@ -27,6 +27,7 @@ import json
 import os
 
 from langchain_anthropic import ChatAnthropic
+from langsmith import traceable
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -66,6 +67,7 @@ Respond ONLY with valid JSON — no prose before or after:
 }}"""
 
 
+@traceable(name="classify_query_intent")
 def classify_intent(query: str) -> dict:
     """
     Classify a query's intent using claude-haiku.

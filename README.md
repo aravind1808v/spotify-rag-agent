@@ -62,6 +62,7 @@ A RAG (Retrieval-Augmented Generation) agent that combines the **Spotify API**, 
 | PDF Parsing | pypdf |
 | Web Scraping | LangChain `WebBaseLoader` + BeautifulSoup |
 | Orchestration | LangChain |
+| Observability | LangSmith |
 
 ---
 
@@ -90,6 +91,11 @@ SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 ANTHROPIC_API_KEY=your_anthropic_api_key
 COHERE_API_KEY=your_cohere_api_key
+
+# Optional — enables LangSmith tracing
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langsmith_api_key
+LANGCHAIN_PROJECT=spotify-rag-agent
 ```
 
 | Key | Where to get it |
@@ -97,6 +103,17 @@ COHERE_API_KEY=your_cohere_api_key
 | `SPOTIFY_CLIENT_ID/SECRET` | [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) → Create App → Web API |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
 | `COHERE_API_KEY` | [dashboard.cohere.com](https://dashboard.cohere.com) (free tier available) |
+| `LANGCHAIN_API_KEY` | [smith.langchain.com](https://smith.langchain.com) → Settings → API Keys (optional) |
+
+### 3. LangSmith tracing (optional)
+
+If `LANGCHAIN_TRACING_V2=true` and `LANGCHAIN_API_KEY` are set, every pipeline run is traced automatically. The project is created on the first run — no manual setup needed in the UI.
+
+Traced steps per run:
+- `cohere_rank_results` — Cohere rerank scores for Spotify results
+- `retrieve_and_rerank` — FAISS candidate fetch + Cohere cross-encoder rerank
+- `classify_query_intent` — detected intent + extracted sub-questions
+- All `ChatAnthropic` calls — full prompts, responses, token counts, latency
 
 ---
 

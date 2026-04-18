@@ -12,6 +12,11 @@ import logging
 import os
 import sys
 
+# Load .env before any LangSmith/LangChain imports so LANGCHAIN_API_KEY
+# is present when the tracing client initialises at import time.
+from dotenv import load_dotenv
+load_dotenv()
+
 # Suppress noisy info messages from sagemaker and langchain WebBaseLoader
 logging.getLogger("sagemaker").setLevel(logging.WARNING)
 logging.getLogger("sagemaker.config").setLevel(logging.WARNING)

@@ -11,6 +11,7 @@ import cohere
 from langchain_cohere import CohereEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
+from langsmith import traceable
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -100,6 +101,7 @@ def build_vector_store_from_docs(docs: list[Document]) -> FAISS:
     return FAISS.from_documents(docs, embedding_model)
 
 
+@traceable(name="retrieve_and_rerank")
 def retrieve_and_rerank(
     vector_store: FAISS,
     query: str,

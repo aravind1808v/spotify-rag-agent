@@ -15,6 +15,7 @@ import os
 import math
 from typing import Any
 import cohere
+from langsmith import traceable
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -55,6 +56,7 @@ def _normalise(values: list[float]) -> list[float]:
     return [(v - min_v) / (max_v - min_v) for v in values]
 
 
+@traceable(name="cohere_rank_results")
 def rank_results(
     query: str,
     podcasts: list[dict[str, Any]],
